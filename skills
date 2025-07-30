@@ -1,0 +1,100 @@
+import React, { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
+
+const contractAddress = 'YOUR_CONTRACT_ADDRESS_HERE'; // Replace this
+const contractABI = [
+  // Paste your contract ABI here
+];
+
+function App() {
+  const [account, setAccount] = useState('');
+  const [contract, setContract] = useState(null);
+  const [resumeForm, setResumeForm] = useState({
+    name: '',
+    email: '',
+    qualification: '',
+    skills: '',
+    experience: ''
+  });
+  const [resumeIds, setResumeIds] = useState([]);
+  const [resumeDetails, setResumeDetails] = useState([]);
+
+  const connectWallet = async () => {
+    if (window.ethereum) {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const accounts = await provider.send("eth_requestAccounts", []);
+      const signer = provider.getSigner();
+      const contractInstance = new ethers.Contract(contractAddress, contractABI, signer);
+      setAccount(accounts[0]);
+      setContract(contractInstance);
+    } else {
+      alert("Please install MetaMask!");
+    }
+  };
+
+  const submitResume = async () => {
+    const { name, email, qualification, skills, experience } = resumeForm;
+    const skillsArray = skills.split(',').map(skill => skill.trim());
+    const tx = await contract.submitResume(name, email, qualification, skillsArray, experience);
+    await tx.wait();
+    alert("Resume submitted successfully");
+    fetchMyResumeIds();
+  };
+
+  const fetchMyResumeIds = async () => {
+    const ids = await contract.getMyResumeIds();
+    setResumeIds(ids.map(id => id.toNumber()));
+  };
+
+  const fetchResumeDetails = async () => {
+    const details = await Promise.all(
+      resumeIds.map(async id => {
+        const data = await contract.getResume(id);
+        return { id, ...data };
+      })
+    );
+    setResumeDetails(details);
+  };
+
+  useEffect(() => {
+    if (contract) fetchMyResumeIds();
+  }, [contract]);
+
+  useEffect(() => {
+    if (resumeIds.length > 0) fetchResumeDetails();
+  }, [resumeIds]);
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h2>Decentralized Resume & Skill Verification</h2>
+      <button onClick={connectWallet}>{account ? `Connected: ${account}` : 'Connect Wallet'}</button>
+
+      <div style={{ marginTop: 20 }}>
+        <h3>Submit Resume</h3>
+        <input placeholder="Name" onChange={e => setResumeForm({ ...resumeForm, name: e.target.value })} /><br />
+        <input placeholder="Email" onChange={e => setResumeForm({ ...resumeForm, email: e.target.value })} /><br />
+        <input placeholder="Qualification" onChange={e => setResumeForm({ ...resumeForm, qualification: e.target.value })} /><br />
+        <input placeholder="Skills (comma separated)" onChange={e => setResumeForm({ ...resumeForm, skills: e.target.value })} /><br />
+        <input placeholder="Experience" onChange={e => setResumeForm({ ...resumeForm, experience: e.target.value })} /><br />
+        <button onClick={submitResume}>Submit Resume</button>
+      </div>
+
+      <div style={{ marginTop: 30 }}>
+        <h3>My Resumes</h3>
+        {resumeDetails.map((res, index) => (
+          <div key={index} style={{ border: '1px solid gray', padding: 10, marginBottom: 10 }}>
+            <p><strong>ID:</strong> {res.id}</p>
+            <p><strong>Name:</strong> {res[0]}</p>
+            <p><strong>Email:</strong> {res[1]}</p>
+            <p><strong>Qualification:</strong> {res[2]}</p>
+            <p><strong>Skills:</strong> {res[3].join(', ')}</p>
+            <p><strong>Experience:</strong> {res[4]}</p>
+            <p><strong>Verified:</strong> {res[5] ? 'Yes' : 'No'}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default App;
